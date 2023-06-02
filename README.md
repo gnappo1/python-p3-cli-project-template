@@ -12,22 +12,23 @@
 You now have a basic idea of what constitutes a CLI, but you (understandably!)
 likely don't have the best idea of where to start. Fork and clone this lesson
 for a template for your CLI. Take a look at the directory structure before we
-begin:
+begin and please keep in mind that the classes listed are just an example:
 
 ```console
 .
-├── Pipfile
-├── Pipfile.lock
-├── README.md
 └── lib
-    ├── cli.py
     ├── classes
         ├── doctor.py
         ├── appointment.py
         ├── patient.py
     │   └── seed.py
+    ├── __init__.py
+    ├── cli.py
     ├── debug.py
     └── helpers.py
+├── Pipfile
+├── Pipfile.lock
+├── README.md
 ```
 
 > **Note: You may already know some or all of the material covered in this
