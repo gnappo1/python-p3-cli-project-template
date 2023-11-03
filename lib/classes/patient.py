@@ -3,6 +3,8 @@ import re
 
 
 class Patient:
+    all = {}
+
     def __init__(self, full_name, email, phone, id=None):
         self.full_name = full_name
         self.email = email
@@ -12,18 +14,22 @@ class Patient:
     def __repr__(self):
         return f"<Patient {self.id}: {self.full_name}, {self.email}, {self.phone}>"
 
+    #! Attributes and Properties
+
     @property
     def full_name(self):
         return self._full_name
 
     @full_name.setter
     def full_name(self, full_name):
-        if isinstance(full_name, str) and re.match(r"^[a-zA-Z]+ [a-zA-Z]+$", full_name):
-            self._full_name = full_name
-        else:
+        if not isinstance(full_name, str):
+            raise TypeError("Full name must be a string")
+        elif not re.match(r"^[a-zA-Z]+ [a-zA-Z]+$", full_name):
             raise ValueError(
                 "Full name cannot be empty and must contain two words separated by a space"
             )
+        else:
+            self._full_name = full_name
 
     @property
     def email(self):
@@ -31,10 +37,12 @@ class Patient:
 
     @email.setter
     def email(self, email):
-        if isinstance(email, str) and re.match(r"^\w+@\w+\.\w+$", email):
-            self._email = email
-        else:
+        if not isinstance(email, str):
+            raise TypeError("Email must be a string")
+        elif not re.match(r"^\w+@\w+\.\w+$", email):
             raise ValueError("Email must be in format: yourcompany@domain.com")
+        else:
+            self._email = email
 
     @property
     def phone(self):
@@ -42,53 +50,17 @@ class Patient:
 
     @phone.setter
     def phone(self, phone):
-        if isinstance(phone, str) and re.match(r"^\d{3}-\d{3}-\d{4}$", phone):
-            self._phone = phone
-        else:
+        if not isinstance(phone, str):
+            raise TypeError("Phone must be a string")
+        elif not re.match(r"^\d{3}-\d{3}-\d{4}$", phone):
             raise ValueError("Phone must be in format: 123-456-7890")
+        else:
+            self._phone = phone
 
-    def __repr__(self):
-        return (
-            f"<Patient {self.id}: {self.full_name}, {self.email}, {self.phone}>"
-        )
-
-    def update(self):
-        CURSOR.execute(
-            """
-            UPDATE patients
-            SET full_name = ?, email = ?, phone_number = ?
-            WHERE id = ?
-        """,
-            (self.full_name, self.email, self.phone, self.id),
-        )
-        CONN.commit()
-        return type(self).find_by_id(self.id)
-
-    def save(self):
-        # self is only instantiated so it has no id
-        CURSOR.execute(
-            """
-            INSERT INTO patients (full_name, email, phone_number)
-            VALUES (?, ?, ?);
-        """,
-            (self.full_name, self.email, self.phone),
-        )
-        CONN.commit()
-        self.id = CURSOR.lastrowid
-
-    def delete(self):
-        CURSOR.execute(
-            """
-            DELETE FROM patients
-            WHERE id = ?
-        """,
-            (self.id,),
-        )
-        CONN.commit()
-        return self
+    #! Association Methods
 
     def appointments(self):
-        CONN.execute(
+        CURSOR.execute(
             """
             SELECT * FROM appointments
             WHERE patient_id = ?
@@ -103,9 +75,13 @@ class Patient:
     def doctors(self):
         return list({appt.doctor for appt in self.appointments()})
 
+    #! Helper Methods
+
+    #! Utility ORM Class Methods
+
     @classmethod
     def create_table(cls):
-        CONN.execute(
+        CURSOR.execute(
             """
             CREATE TABLE IF NOT EXISTS patients (
                 id INTEGER PRIMARY KEY,
@@ -162,7 +138,8 @@ class Patient:
             """
             SELECT * FROM patients
             WHERE full_name is ?;
-        """, (name, )
+        """,
+            (name,),
         )
         row = CURSOR.fetchone()
         return cls(row[1], row[2], row[3], row[0]) if row else None
@@ -180,10 +157,52 @@ class Patient:
         return cls(row[1], row[2], row[3], row[0]) if row else None
 
     @classmethod
-    def find_or_create_by(cls, date, time, description, doctor, patient):
-        cls.find_by_date_and_time(date, time) or cls.create(
-            date, time, description, doctor, patient
+    def find_or_create_by(cls, full_name, email, phone):
+        return cls.find_by_name(full_name) or cls.create(full_name, email, phone)
+
+    #! Utility ORM Instance Methods
+
+    def save(self):
+        # self is only instantiated so it has no id
+        CURSOR.execute(
+            """
+            INSERT INTO patients (full_name, email, phone_number)
+            VALUES (?, ?, ?);
+        """,
+            (self.full_name, self.email, self.phone),
         )
+        CONN.commit()
+        self.id = CURSOR.lastrowid
+        type(self).all[self.id] = self
+        return self
+
+    def update(self):
+        CURSOR.execute(
+            """
+            UPDATE patients
+            SET full_name = ?, email = ?, phone_number = ?
+            WHERE id = ?
+        """,
+            (self.full_name, self.email, self.phone, self.id),
+        )
+        CONN.commit()
+        type(self).all[self] = self
+        return self
+
+    def delete(self):
+        CURSOR.execute(
+            """
+            DELETE FROM patients
+            WHERE id = ?
+        """,
+            (self.id,),
+        )
+        CONN.commit()
+        #! Remove memoized object
+        del type(self).all[self.id]
+        #! Nullify id
+        self.id = None
+        return self
 
 
 from classes.appointment import Appointment

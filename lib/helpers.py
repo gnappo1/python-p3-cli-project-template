@@ -6,7 +6,8 @@ def welcome():
 
 
 def menu():
-    print("Please select an option:")
+    print("Please select a group of options:")
+    print()
     print("1. List all doctors")
     print("2. List all patients")
     print("3. List all appointments")
@@ -28,25 +29,36 @@ def menu():
 
 def list_doctors():
     doctors = Doctor.get_all()
-    for doctor in doctors:
-        print(doctor)
+    if doctors:
+        for doctor in doctors:
+            print(doctor)
+    else:
+        print(
+            "I am sorry we underwent severe budget cuts and we no longer have doctors on payroll"
+        )
 
 
 def list_patients():
     patients = Patient.get_all()
-    for patient in patients:
-        print(patient)
+    if patients:
+        for patient in patients:
+            print(patient)
+    else:
+        print("I am sorry, it looks like we have no patients in our system")
 
 
 def list_appointments():
     appointments = Appointment.get_all()
-    for appointment in appointments:
-        print(appointment)
+    if appointments:
+        for appointment in appointments:
+            print(appointment)
+    else:
+        print("I am sorry, it looks like we have no appointments in our system")
 
 
 def find_doctor_by_name():
     name = input("Enter the doctor's name: ")
-    if len(name).trim() and re.match(r"^[a-zA-Z ]+$", name) and name.title():
+    if len(name.strip()) and re.match(r"^[a-zA-Z ]+$", name) and name.title():
         doctor = Doctor.find_by_name(name.title())
         print(doctor) if doctor else print("No doctor found")
     else:
@@ -55,7 +67,12 @@ def find_doctor_by_name():
 
 def find_patient_by_name():
     name = input("Enter the patient's name: ")
-    if isinstance(name, str) and len(name) > 0 and re.match(r"^[a-zA-Z ]+$", name) and name.title():
+    if (
+        isinstance(name, str)
+        and name.strip()
+        and re.match(r"^[a-zA-Z ]+$", name)
+        and name.title()
+    ):
         patient = Patient.find_by_name(name.title())
         print(patient) if patient else print("No patient found")
     else:
@@ -73,8 +90,8 @@ def find_appointment_by_date_and_time():
 
 
 def create_doctor():
-    name = input("Enter the doctor's name: ")
-    phone = input("Enter the doctor's phone number: ")
+    name = input("Enter the doctor's name: (i.e. Dr Bob)")
+    phone = input("Enter the doctor's phone number: (i.e. 123-456-7890)")
     specialty = input("Enter the doctor's specialty: ")
     if (
         isinstance(name, str)
@@ -130,7 +147,9 @@ def create_appointment():
         and re.match(r"([0][0-9]|[1][0-2]):[0-5][0-9](AM|PM)", time)
     ):
         try:
-            appointment = Appointment.create(date, time, description, doctor_id, patient_id)
+            appointment = Appointment.create(
+                date, time, description, int(doctor_id), int(patient_id)
+            )
             print(appointment)
         except Exception as e:
             print("Error creating appointment: ", e)
@@ -210,16 +229,19 @@ def update_patient():
 
 
 def update_appointment_by_id(id, date, time, description, doctor_name, patient_name):
-    appointment = Appointment.find_by_id(id)
-    appointment.date = date
-    appointment.time = time
-    appointment.description = description
-    doctor = Doctor.find_by_name(doctor_name.title())
-    patient = Patient.find_by_name(patient_name.title())
-    appointment.doctor = doctor
-    appointment.patient = patient
-    appointment = appointment.update()
-    print(appointment)
+    try:
+        appointment = Appointment.find_by_id(id)
+        appointment.date = date
+        appointment.time = time
+        appointment.description = description
+        doctor = Doctor.find_by_name(doctor_name.title())
+        patient = Patient.find_by_name(patient_name.title())
+        appointment.doctor_id = doctor.id
+        appointment.patient_id = patient.id
+        appointment = appointment.update()
+        print(appointment)
+    except Exception as e:
+            print("Error updating appointment: ", e)
 
 
 def update_appointment():
@@ -255,9 +277,12 @@ def update_appointment():
 
 
 def delete_doctor_by_id(id):
-    doctor = Doctor.find_by_id(id)
-    doctor = doctor.delete()
-    print(doctor)
+    if doctor:= Doctor.find_by_id(int(id)):
+        import ipdb; ipdb.set_trace()
+        doctor.delete()
+        print("Doctor successfully deleted")
+    else:
+        print("Invalid id")
 
 
 def delete_doctor():
@@ -304,14 +329,18 @@ def delete_appointment():
     else:
         print("Invalid id")
 
+
 def find_patients_by_doctor_name():
     name = input("Enter the doctor's name: ")
     if len(name) > 0 and re.match(r"^[a-zA-Z ]+$", name) and name.title():
-        patients = Doctor.find_by_name(name.title()).patients()
-        for patient in patients:
-            print(patient)
+        doctor = Doctor.find_by_name(name.title())
+        if doctor:
+            patients = doctor.patients()
+            for patient in patients:
+                print(patient())
     else:
         print("Invalid name")
+
 
 from classes.doctor import Doctor
 from classes.patient import Patient

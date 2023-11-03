@@ -41,7 +41,7 @@ begin and please keep in mind that the classes listed are just an example:
 
 This project will likely be one of the biggest projects you've undertaken so
 far. Your first task should be creating a Git repository to keep track of your
-work and roll back any undesired changes.
+work and rollback any undesired changes.
 
 ### Removing Existing Git Configuration
 

@@ -1,7 +1,11 @@
 from classes.__init__ import CURSOR, CONN
 import re
+from datetime import datetime
+
 
 class Appointment:
+    all = {}
+
     def __init__(self, date, time, description, doctor_id, patient_id, id=None):
         self.date = date
         self.time = time
@@ -14,44 +18,40 @@ class Appointment:
         return (
             f"<Appointment {self.id}: {self.date} @{self.time}, "
             + f"{self.description}, "
-            + f"Doctor ID: {self.doctor or self.doctor_id}, "
-            + f"Patient ID: {self.patient or self.patient_id}>"
+            + f"Doctor ID: {self.doctor_id}, "
+            + f"Patient ID: {self.patient_id}>"
         )
+
+    #! Attributes and Properties
 
     @property
-    def doctor(self):
-        CONN.execute(
-        """
-            SELECT * FROM doctors
-            WHERE id = ?;
-        """, (self.doctor_id,)
-        )
-        row = CURSOR.fetchone()
-        return Doctor(row[1], row[2], row[3], row[0]) if row else None
+    def doctor_id(self):
+        return self._doctor_id
 
-
-    @doctor.setter
-    def doctor(self, doctor_id):
-        if isinstance(doctor_id, int) and doctor_id > 0 and Doctor.find_by_id(doctor_id):
-            self._doctor_id = doctor_id
+    @doctor_id.setter
+    def doctor_id(self, doctor_id):
+        if not isinstance(doctor_id, int):
+            raise TypeError("Doctor_id must be an integer")
+        elif doctor_id < 1 or not Doctor.find_by_id(doctor_id):
+            raise ValueError(
+                "Doctor ID must be a positive integer and pointing to an existing doctor"
+            )
         else:
-            raise ValueError("Doctor ID must be a positive integer and doctor must exist")
+            self._doctor_id = doctor_id
 
     @property
-    def patient(self):
-        CONN.execute(
-        """
-            SELECT * FROM patients
-            WHERE id = ?;
-        """, (self.patient_id,)
-        )
-        row = CURSOR.fetchone()
-        return Patient(row[1], row[2], row[3], row[0]) if row else None
+    def patient_id(self):
+        return self._patient_id
 
-
-    @patient.setter
-    def patient(self, patient_id):
-        if isinstance(patient_id, int) and patient_id > 0 and Patient.find_by_id(patient_id):
+    @patient_id.setter
+    def patient_id(self, patient_id):
+        if not isinstance(patient_id, int):
+            raise TypeError("Patient_id must be must be an integer")
+        elif patient_id < 1 or not Patient.find_by_id(patient_id):
+            raise ValueError(
+                "Patient_id must be a positive integer and pointing to an existing patient"
+            )
+        else:
             self._patient_id = patient_id
 
     @property
@@ -60,10 +60,14 @@ class Appointment:
 
     @date.setter
     def date(self, date):
-        if re.match(r"([0][1-9]|[1][0-2])\/([0][1-9]|[12][0-9]|[3][01])\/\d{4}", date):
-            self._date = date
-        else:
+        if not isinstance(date, str):
+            raise TypeError("Date must be a string")
+        elif not re.match(
+            r"([0][1-9]|[1][0-2])\/([0][1-9]|[12][0-9]|[3][01])\/\d{4}", date
+        ):
             raise ValueError("Date must be in format MM/DD/YYYY")
+        else:
+            self._date = date
 
     @property
     def time(self):
@@ -71,10 +75,12 @@ class Appointment:
 
     @time.setter
     def time(self, time):
-        if re.match(r"([0][0-9]|[1][0-2]):[0-5][0-9](AM|PM)", time):
-            self._time = time
-        else:
+        if not isinstance(time, str):
+            raise TypeError("Time must be a string")
+        elif not re.match(r"([0][0-9]|[1][0-2]):[0-5][0-9](AM|PM)", time):
             raise ValueError("Time must be in format HH:MMAM or HH:MMPM")
+        else:
+            self._time = time
 
     @property
     def description(self):
@@ -82,55 +88,40 @@ class Appointment:
 
     @description.setter
     def description(self, description):
-        if isinstance(description, str) and len(description) > 2:
-            self._description = description
-        else:
+        if not isinstance(description, str):
+            raise TypeError("Description must be a string")
+        elif len(description) < 3:
             raise ValueError("Description must be a string longer than 2 characters")
+        else:
+            self._description = description
 
-    def update(self):
-        CURSOR.execute(
-            """
-            UPDATE appointments
-            SET date = ?, time = ?, description = ?, doctor_id = ?, patient_id = ?
-            WHERE id = ?
-        """,
-            (
-                self.date,
-                self.time,
-                self.description,
-                self.doctor_id,
-                self.patient_id,
-                self.id,
-            ),
-        )
-        CONN.commit()
-        return type(self).find_by_id(self.id)
+    #! Association Methods
 
-    def save(self):
-        # self is only instantiated so it has no id
-        CURSOR.execute(
-            """
-            INSERT INTO appointments (date, time, description, doctor_id, patient_id)
-            VALUES (?, ?, ?, ?, ?);
-        """,
-            (self.date, self.time, self.description, self.doctor_id, self.patient_id),
-        )
-        CONN.commit()
-        self.id = CURSOR.lastrowid
+    def doctor(self):
+        return Doctor.find_by_id(self.doctor_id) if self.doctor_id else None
 
-    def delete(self):
-        CURSOR.execute(
-            """
-            DELETE FROM appointments
-            WHERE id = ?;
-        """,
-            (self.id,),
-        )
-        CONN.commit()
+    def patient(self):
+        return Patient.find_by_id(self.patient_id) if self.patient_id else None
 
+    #! Helper Methods
+    def in_the_future(self, date):
+        try:
+            today = datetime.now()
+            if int(date[-4:]) > today.year:
+                return True
+            if int(date[-4:]) != today.year:
+                return False
+            if int(date[:2]) > today.month:
+                return True
+            else:
+                return int(date[:2]) == today.month and int(date[2:4]) > today.day
+        except Exception as e:
+            return f"Date is not in mm/dd/yyyy format or is in the past! {e}"
+
+    #! Utility ORM Class Methods
     @classmethod
     def create_table(cls):
-        CONN.execute(
+        CURSOR.execute(
             """
             CREATE TABLE IF NOT EXISTS appointments (
                 id INTEGER PRIMARY KEY,
@@ -139,8 +130,8 @@ class Appointment:
                 description TEXT,
                 doctor_id INTEGER,
                 patient_id INTEGER,
-                FOREIGN KEY (doctor_id) REFERENCES doctors(id),
-                FOREIGN KEY (patient_id) REFERENCES patients(id)
+                FOREIGN KEY (doctor_id) REFERENCES doctors(id) ON DELETE CASCADE,
+                FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE
             );
         """
         )
@@ -173,7 +164,9 @@ class Appointment:
         """
         )
         row = CURSOR.fetchone()
-        return cls(row[1], row[2], row[3], row[4], row[5], row[0])
+        appt = cls(row[1], row[2], row[3], row[4], row[5], row[0])
+        cls.all[appt.id] = appt
+        return appt
 
     @classmethod
     def get_all(cls):
@@ -211,9 +204,59 @@ class Appointment:
 
     @classmethod
     def find_or_create_by(cls, date, time, description, doctor_id, patient_id):
-        cls.find_by_date_and_time(date, time) or cls.create(
+        return cls.find_by_date_and_time(date, time) or cls.create(
             date, time, description, doctor_id, patient_id
         )
+
+    #! Utility ORM Instance Methods
+    def update(self):
+        CURSOR.execute(
+            """
+            UPDATE appointments
+            SET date = ?, time = ?, description = ?, doctor_id = ?, patient_id = ?
+            WHERE id = ?
+        """,
+            (
+                self.date,
+                self.time,
+                self.description,
+                self.doctor_id,
+                self.patient_id,
+                self.id,
+            ),
+        )
+        CONN.commit()
+        type(self).all[self.id] = self
+        return self
+
+    def save(self):
+        # self is only instantiated so it has no id
+        CURSOR.execute(
+            """
+            INSERT INTO appointments (date, time, description, doctor_id, patient_id)
+            VALUES (?, ?, ?, ?, ?);
+        """,
+            (self.date, self.time, self.description, self.doctor_id, self.patient_id),
+        )
+        CONN.commit()
+        self.id = CURSOR.lastrowid
+        type(self).all[self.id] = self
+        return self
+
+    def delete(self):
+        CURSOR.execute(
+            """
+            DELETE FROM appointments
+            WHERE id = ?;
+        """,
+            (self.id,),
+        )
+        CONN.commit()
+        #! Remove memoized object
+        del type(self).all[self.id]
+        #! Nullify id
+        self.id = None
+        return self
 
 
 from classes.doctor import Doctor
